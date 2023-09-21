@@ -58,16 +58,16 @@ When the Break Glass User assumes the Break Glass Role in another account (via t
            margin-left: auto;
            margin-right: auto;
            width: 75%;"
-    src="./BreakGlassUser.jpg" 
+    src="./BreakGlassUser.png" 
     alt="BreakGlassUser Architecture">
 </img>
 <br/>
 
 ## Deployment Instructions
 
-- Deploy [breakglassuser.tf](./breakglassuser.tf) into the account where the break glass user will reside. This can be deployed in the master account, though many organizations deploy the user in a security account. You will need to update the file with the email address of where the notification will be sent. We recommend using an email distribution list to ensure notification coverage.
+- Deploy [breakglassuser.tf](./bg-user/breakglassuser.tf) into the account where the break glass user will reside. This can be deployed in the management account, though AWS recommends deploying the user in a security account or dedicated account. You will need to update the file with the email address of where the notification will be sent. We recommend using an email distribution list to ensure notification coverage.
 
-- Deploy [breakglassrole.tf](./breakglassrole.tf) into all other accounts. This is the role that the break glass user will assume. The role in this file assigns [IAMFullAccess](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/IAMFullAccess.html) which is NOT a least priviledged policy. This can be changed according to your organizations security requirements. 
+- Deploy [breakglassrole.tf](./bg-role/breakglassrole.tf) into all other accounts. This is the role that the break glass user will assume. The role in this file assigns [IAMFullAccess](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/IAMFullAccess.html) which is NOT a least priviledged policy. This can be changed according to your organizations security requirements. 
 
 ## After Deployment
 

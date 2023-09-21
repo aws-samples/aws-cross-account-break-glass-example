@@ -1,14 +1,15 @@
 data "aws_caller_identity" "current" {}
 locals {
-    account_id = data.aws_caller_identity.current.account_id
+  account_id = data.aws_caller_identity.current.account_id
 }
 
 variable "emailAddress" {
+  type        = string
   description = "Enter the email address to subscribe to the SNS notification"
 }
 
 //Creates a Breakglass User
-resource "aws_iam_user" "bgu" {
+resource "aws_iam_user" "bguser" {
   name = "BreakglassUser"
 }
 /* Assigning IAM Full Access to the breakglass user on the account where it's deployed
@@ -16,7 +17,7 @@ The code currently uses the AWS managed IAMFullAccess policy to ensure that the 
 This is NOT a least privileged policy and can be changed according to Organization's security requirements.
 */
 resource "aws_iam_user_policy_attachment" "IAMAccess" {
-  user       = aws_iam_user.bgu.name
+  user       = aws_iam_user.bguser.name
   policy_arn = "arn:aws:iam::aws:policy/IAMFullAccess"
 }
 // Policy which allows the IAM User to perform a switch role to the BreakGlassRole
@@ -29,21 +30,21 @@ resource "aws_iam_policy" "BreakGlassAssumeRole" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action = "sts:AssumeRole"
+        Action   = "sts:AssumeRole"
         Effect   = "Allow"
         Resource = "arn:aws:iam::*:role/BreakGlassRole"
       },
     ]
   })
 }
-resource "aws_iam_user_policy_attachment" "assumerole" {
-  user       = aws_iam_user.bgu.name
+resource "aws_iam_user_policy_attachment" "assume-role" {
+  user       = aws_iam_user.bguser.name
   policy_arn = aws_iam_policy.BreakGlassAssumeRole.arn
 }
 
 // Cloudwatch Alarm for breakglass user login
 
-resource "aws_cloudwatch_event_rule" "console" {
+resource "aws_cloudwatch_event_rule" "login-event" {
   name        = "capture-breakglass-user-sign-in"
   description = "Capture breakglass user AWS Console Sign In"
 
@@ -63,15 +64,15 @@ resource "aws_cloudwatch_event_rule" "console" {
 EOF
 }
 
-resource "aws_cloudwatch_event_target" "sns" {
-  rule      = aws_cloudwatch_event_rule.console.name
+resource "aws_cloudwatch_event_target" "login-target" {
+  rule      = aws_cloudwatch_event_rule.login-event.name
   target_id = "SendToSNS"
   arn       = aws_sns_topic.aws_logins.arn
 }
 
 // Cloudwatch Alarm for breakglass user switch role
 
-resource "aws_cloudwatch_event_rule" "sr" {
+resource "aws_cloudwatch_event_rule" "switch-event" {
   name        = "capture-breakglass-user-switch-role"
   description = "Capture breakglass user switching roles"
 
@@ -91,22 +92,22 @@ resource "aws_cloudwatch_event_rule" "sr" {
 EOF
 }
 
-resource "aws_cloudwatch_event_target" "sns-sr" {
-  rule      = aws_cloudwatch_event_rule.sr.name
+resource "aws_cloudwatch_event_target" "switch-target" {
+  rule      = aws_cloudwatch_event_rule.switch-event.name
   target_id = "SendToSNS"
   arn       = aws_sns_topic.aws_logins.arn
 }
 
 //SNS topic creation
 resource "aws_sns_topic" "aws_logins" {
-  name = "breakglassuser-console-logins"
+  name              = "breakglassuser-console-logins"
   kms_master_key_id = "alias/breakglassSNS"
 }
 
 resource "aws_sns_topic_subscription" "sns-topic" {
   topic_arn = aws_sns_topic.aws_logins.arn
   protocol  = "email"
-  endpoint  = local.emailAddress
+  endpoint  = var.emailAddress
 }
 
 resource "aws_sns_topic_policy" "default" {
@@ -137,8 +138,8 @@ If the SNS topic must be encrypted at rest, then use a customer managed key.
 resource "aws_kms_key" "kmskey" {
   description             = "BreakGlass SNS Topic"
   deletion_window_in_days = 10
-  policy = data.aws_iam_policy_document.hello.json
-  enable_key_rotation = true
+  policy                  = data.aws_iam_policy_document.keypolicy.json
+  enable_key_rotation     = true
 }
 resource "aws_kms_alias" "alias" {
   name          = "alias/breakglassSNS"

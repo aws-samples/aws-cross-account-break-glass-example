@@ -27,7 +27,7 @@ The use cases for break glass access include:
 <br/><br/>
 
 # The Break Glass User
-For customers using [IAM Identity Center](https://aws.amazon.com/iam/identity-center/) for the Single Sign On (SSO) of workforce identities in AWS, an external IdP is recommended. In the unfortunated circumstance where SSO integration is unavailable, it is advised to have a *Break Glass* user created in [Identity and Access Managment](https://aws.amazon.com/iam/) (IAM). This user can be used to gain administrative access to your AWS envrionment during an emergency when SSO is not available.
+For customers using [IAM Identity Center](https://aws.amazon.com/iam/identity-center/) for the Single Sign On (SSO) of workforce identities in AWS, an external IdP is recommended. In the unfortunated circumstance where SSO integration is unavailable, it is advised to have a *Break Glass* user created in [Identity and Access Managment](https://aws.amazon.com/iam/) (IAM). This user can be used to gain administrative access to your AWS environment during an emergency when SSO is not available.
 
 Since the Break Glass user is only needed in case of emergency, it will be implemented in a single AWS account so that it may be tightly controlled. The Break Glass user may access other accounts through the '[SwitchRole](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use.html)' mechanism. 
 

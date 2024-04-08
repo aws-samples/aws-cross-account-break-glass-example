@@ -98,6 +98,40 @@ resource "aws_cloudwatch_event_target" "switch-target" {
   arn       = aws_sns_topic.aws_logins.arn
 }
 
+resource "aws_cloudwatch_event_target" "login-target" {
+  rule      = aws_cloudwatch_event_rule.login-event.name
+  target_id = "SendToSNS"
+  arn       = aws_sns_topic.aws_logins.arn
+}
+
+// Cloudwatch Alarm for breakglass user assume role
+
+resource "aws_cloudwatch_event_rule" "assume-event" {
+  name        = "capture-breakglass-user-assume-role"
+  description = "Capture breakglass user assuming roles via the CLI"
+
+  event_pattern = <<EOF
+{
+  "source": ["aws.sts"],
+  "detail-type": ["AWS API Call via CloudTrail"],
+  "detail": {
+    "eventSource": ["sts.amazonaws.com"],
+    "eventName": ["AssumeRole"],
+    "userIdentity": {
+      "type": ["IAMUser"],
+      "userName": ["BreakglassUser"]
+    }
+  }
+}
+EOF
+}
+
+resource "aws_cloudwatch_event_target" "assume-target" {
+  rule      = aws_cloudwatch_event_rule.assume-event.name
+  target_id = "SendToSNS"
+  arn       = aws_sns_topic.aws_logins.arn
+}
+
 //SNS topic creation
 resource "aws_sns_topic" "aws_logins" {
   name              = "breakglassuser-console-logins"

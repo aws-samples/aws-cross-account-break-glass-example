@@ -98,12 +98,6 @@ resource "aws_cloudwatch_event_target" "switch-target" {
   arn       = aws_sns_topic.aws_logins.arn
 }
 
-resource "aws_cloudwatch_event_target" "login-target" {
-  rule      = aws_cloudwatch_event_rule.login-event.name
-  target_id = "SendToSNS"
-  arn       = aws_sns_topic.aws_logins.arn
-}
-
 // Cloudwatch Alarm for breakglass user assume role
 
 resource "aws_cloudwatch_event_rule" "assume-event" {

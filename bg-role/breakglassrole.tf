@@ -1,5 +1,5 @@
 variable "AccoundID" {
-  type        = number
+  type        = string
   description = "Enter the AWS account ID where the BreakGlassUser is deployed"
 }
 

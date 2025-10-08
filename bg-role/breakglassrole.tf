@@ -1,6 +1,11 @@
 variable "AccoundID" {
-  type        = number
+  type        = string
   description = "Enter the AWS account ID where the BreakGlassUser is deployed"
+
+  validation {
+    condition     = length(var.AccoundID) == 12 && can(regex("^[[:digit:]]+$", var.AccoundID))
+    error_message = "Account ID must be 12 digits"
+  }
 }
 
 resource "aws_iam_role" "BreakGlassRole" {

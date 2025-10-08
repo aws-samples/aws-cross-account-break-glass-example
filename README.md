@@ -1,7 +1,7 @@
 # aws-cross-account-break-glass-example
 This repository contains a reference implementation for an IAM user with cross account role assumption capabilities that can be used in emergency situations.
 
-:warning: **Warning** :warning: The break glass user in this example uses the [IAMFullAccess](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/IAMFullAccess.html) managed policy which is NOT least priviledge. This can be changed according to your organizations security requirements
+:warning: **Warning** :warning: The break glass user in this example uses the [IAMFullAccess](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/IAMFullAccess.html) managed policy which is NOT least privilege. This can be changed according to your organizations security requirements
 :note: IAM events are Global Service Events and are captured in Cloudtrail logs in the us-east-1 region. It is important that the EventBridge code is deployed in us-east-1 in order to process the logs and send notifications successfully.
 https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-concepts.html#cloudtrail-concepts-global-service-events
 

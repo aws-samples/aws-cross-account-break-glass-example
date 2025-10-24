@@ -1,82 +1,233 @@
-# aws-cross-account-break-glass-example
-This repository contains a reference implementation for an IAM user with cross account role assumption capabilities that can be used in emergency situations.
+# AWS Cross-Account Break Glass Example
 
-:warning: **Warning** :warning: The break glass user in this example uses the [IAMFullAccess](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/IAMFullAccess.html) managed policy which is NOT least priviledge. This can be changed according to your organizations security requirements
-:note: IAM events are Global Service Events and are captured in Cloudtrail logs in the us-east-1 region. It is important that the EventBridge code is deployed in us-east-1 in order to process the logs and send notifications successfully.
-https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-concepts.html#cloudtrail-concepts-global-service-events
+This repository provides a reference implementation for emergency access to AWS accounts when normal authentication methods fail. The solution creates an IAM user with cross-account role assumption capabilities and comprehensive multi-region monitoring.
+
+:warning: **Security Warning** :warning: The break glass user uses the [IAMFullAccess](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/IAMFullAccess.html) managed policy, which is NOT least privilege. Customize permissions according to your organization's security requirements.
+
+:information_source: **Global Monitoring** :information_source: This solution provides comprehensive monitoring across all AWS regions where ConsoleLogin events can occur. Break glass activities (console logins, role switches, and role assumptions) are monitored globally and forwarded to a centralized SNS topic for unified alerting.
 
 # Contents
-1. [Introduction](/README.md#introduction)
-2. [The Break Glass User](/README.md#the-break-glass-user)
-3. [Solution Architecture](/README.md#solution-architecture)
-4. [Deployment Instructions](/README.md#deployment-instructions)
-5. [After Deployment](/README.md#after-deployment)
-6. [References](/README.md#references)
-7. [License](/README.md#license)
-<br/><br/>
+
+1. [Introduction](#introduction)
+2. [The Break Glass User](#the-break-glass-user)
+3. [Solution Architecture](#solution-architecture)
+4. [Deployment Instructions](#deployment-instructions)
+5. [Post-Deployment Security Configuration](#post-deployment-security-configuration)
+6. [References](#references)
+7. [License](#license)
 
 # Introduction
 
-The organization management account is often used to provide break glass access to AWS accounts within an organization. Break glass (which draws its name from breaking the glass to pull a ﬁre alarm) refers to a quick means for a person who does not have access privileges to certain AWS accounts to gain access in exceptional circumstances by using an approved process.
+## Why Break Glass Access is Critical
 
-The use cases for break glass access include:
-- Failure of the organization’s Identity Provider (IdP).
-- A security incident involving the organizations’ IdP(s).
-- A failure involving IAM Identity Center.
-- A disaster involving the loss of an organization’s entire cloud or IdP teams. 
+Break glass access is an essential disaster recovery mechanism for AWS organizations. Named after the emergency practice of breaking glass to pull a fire alarm, it provides immediate access to AWS accounts when normal authentication systems fail.
 
-*The break glass IAM user is a long term credential and is extremely important that access to these roles is monitored, and alarms and alerts are triggered when the roles are used to access the environment in order to prevent misuse.*
-<br/><br/>
+### When You Need Break Glass Access
+
+- Complete failure of your organization's Identity Provider (IdP)
+- Security incidents compromising your IdP infrastructure
+- Service outages affecting IAM Identity Center
+- Misconfiguration preventing normal user access
+- Permission set corruption or deletion
+- Loss of entire cloud or identity management teams
+- Ransomware attacks targeting identity infrastructure
+- Natural disasters affecting primary authentication systems
+- Critical security incidents requiring immediate administrative access
+
+*Break glass credentials are long-term IAM user credentials with extensive privileges. Comprehensive monitoring, alerting, and strict access controls are essential to prevent misuse.*
 
 # The Break Glass User
-For customers using [IAM Identity Center](https://aws.amazon.com/iam/identity-center/) for the Single Sign On (SSO) of workforce identities in AWS, an external IdP is recommended. In the unfortunated circumstance where SSO integration is unavailable, it is advised to have a *Break Glass* user created in [Identity and Access Managment](https://aws.amazon.com/iam/) (IAM). This user can be used to gain administrative access to your AWS environment during an emergency when SSO is not available.
 
-Since the Break Glass user is only needed in case of emergency, it will be implemented in a single AWS account so that it may be tightly controlled. The Break Glass user may access other accounts through the '[SwitchRole](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use.html)' mechanism. 
+For organizations using [IAM Identity Center](https://aws.amazon.com/iam/identity-center/) with external Identity Providers, a dedicated break glass IAM user provides emergency access when SSO systems are unavailable.
 
-Alerting is enabled that provides a notification when somebody logs in as the Break Glass user or when the Break Glass user uses the SwitchRole mechanism. Notification in this example uses email for delivery, though the alert could be delivered via a different method.
+The break glass user is deployed in a single AWS account (ideally the security account) for tight access control and monitoring. The user accesses other accounts through:
+
+- **[SwitchRole](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-console.html):** Once signed in as an IAM user you can switch to an IAM role
+- **[AssumeRole](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html):** Used within your account or for cross-account access
+
+## Comprehensive Security Monitoring
+
+Real-time alerting across **all regions where ConsoleLogin events occur** monitors:
+
+- **Console Login Events:** Any sign-in to the AWS Console (monitored in [specific regions where AWS records these events](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-aws-console-sign-in-events.html))
+- **SwitchRole Events:** Role switching activities in the console
+- **AssumeRole Events:** CLI/API-based role assumptions
+
+Events are captured in all regions where AWS records ConsoleLogin events, ensuring no break glass activity goes undetected. Notifications are sent via email.
+
+**Note:** AssumeRole and SwitchRole events can occur in any region where ConsoleLogin is possible, which is why comprehensive multi-region monitoring is essential for complete break glass activity visibility.
 
 ## Solution Architecture
 
-This solution is made up of 5 components:
+This solution implements a multi-region monitoring architecture with centralized alerting, consisting of 6 key components:
 
-- **Break Glass User:** An IAM user is an entity in AWS that represents a human user. The Break Glass user is deployed in the management (or security) account and is authorized to assume the Break Glass Role in other accounts using the SwitchRole mechanism.
+- **Break Glass User:** An IAM user deployed in an account, authorized to assume Break Glass Roles in other accounts.
 
-- **Break Glass Role:** A role specifies a set of permissions that you can use to access AWS resources that you need. When the Break Glass User assumes the Break Glass Role in another account, its original permissions are temporarily set aside and it is granted the permissions specified in the Break Glass Role configured in the target account.
+- **Break Glass Role:** Cross-account roles that specify the permissions granted when the Break Glass User assumes them. These roles are deployed in target accounts that require emergency access.
 
-- **EventBridge:** [Amazon EventBridge](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html) is a serverless service that uses events to trigger actions. In this use case, the EventBridge is used to trigger an SNS notification.
+- **Multi-Region EventBridge Rules:** EventBridge rules deployed across all regions where ConsoleLogin events can occur to capture break glass activities:
+  - **Console Login Events:** Captured in regions where AWS records these events per [AWS documentation](https://docs.aws.amazon.com/general/latest/gr/signin-service.html)
+  - **SwitchRole Events:** Captured in the region where role switching occurs
+  - **AssumeRole Events:** Captured in the region where CLI/API calls are made
 
-- **Amazon SNS:** [Amazon Simple Notification Service](https://docs.aws.amazon.com/sns/latest/dg/welcome.html) (SNS) is a messaging service that provides message delivery from publishers to subscribers. In this use case, EventBridge is the publisher and email is the subscriber.
+- **Cross-Region Event Forwarding:** Secondary regions forward captured events to the primary region's default event bus using IAM roles with cross-region permissions.
 
-- **AWS KMS** [AWS Key Management Service](https://docs.aws.amazon.com/kms/latest/developerguide/overview.html) (KMS) is an AWS managed service that allows you to create and control cryptographic keys used for encryption.
+- **Centralized SNS Topic:** A single SNS topic in the primary region receives all break glass notifications, encrypted with a customer-managed KMS key.
 
-When a user in the organization logs into the management (or security) account as the Break Glass User, they are provided access assuming they have the proper credentials. This login activity creates an authentication event which is captured via EventBridge and a notification is sent via SNS.
+- **AWS KMS:** Customer-managed encryption key that secures the SNS topic while allowing EventBridge to publish messages.
 
-When the Break Glass User assumes the Break Glass Role in another account (via the SwitchRole mechanism) they temporarily assume the permissions defined in the target account. The SwitchRole activity creates a Switch Role event which is captured via EventBridge and a notification is sent via SNS. The SNS topic is encrypted leveraging a KMS key.
+**Event Flow:**
+
+1. Break glass activities occur in any AWS region
+2. Regional EventBridge rules capture the events
+3. Secondary regions forward events to the primary region's event bus
+4. Primary region's EventBridge rules route all events to the centralized SNS topic
+5. SNS delivers encrypted notifications via email
+
+This architecture ensures comprehensive monitoring regardless of which region the break glass user operates in, while maintaining centralized alerting and audit trails.
 
 <br/>
-<img 
+<img
     style="border: 2px solid black;
-           display: block; 
+           display: block;
            margin-left: auto;
            margin-right: auto;
            width: 75%;"
-    src="./BreakGlassUser.png" 
-    alt="BreakGlassUser Architecture">
+    src="./AWSCrossAccountBreakGlass.png"
+    alt="AWS Cross Account Break Glass Architecture">
 </img>
 <br/>
 
 ## Deployment Instructions
 
-- Deploy [breakglassuser.tf](./bg-user/breakglassuser.tf) into the account where the break glass user will reside. This can be deployed in the management account, though AWS recommends deploying the user in a security account or dedicated account. You will need to update the file with the email address of where the notification will be sent. We recommend using an email distribution list to ensure notification coverage.
+### Prerequisites
 
-- Deploy [breakglassrole.tf](./bg-role/breakglassrole.tf) into all other accounts. This is the role that the break glass user will assume. The role in this file assigns [IAMFullAccess](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/IAMFullAccess.html) which is NOT a least priviledged policy. This can be changed according to your organizations security requirements. 
+- AWS CLI configured with administrative permissions
+- Terraform >= 1.0 installed
+- Access to the target AWS accounts
+- Email address for security notifications (recommend using a distribution list)
 
-## After Deployment
+### Option 1: Automated Multi-Region Deployment (Recommended)
 
-- **Enable Multi Factor Authentication (MFA):** Since the Break Glass user is a highly priviledged account, [MFA should be enabled](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_enable.html) to provide additional security for the account. Much like MFA for the root user, the MFA device (or software) should be secured and available to a limited set of members of your organization. Often, MFA for the Break Glass user is secured and only available to select members of the cloud security team.
+The fastest way to deploy comprehensive monitoring across all regions where ConsoleLogin events occur:
 
-- **Setup and vault the password:** The [breakglassuser.tf](./breakglassuser.tf) code purposely does not create the password for the Break Glass user. This is because 1) An IAM user password should never be embedded in code, and 2) we do not want the password logged in a statefile. After the Break Glass user account has been created, the [password will need to be created](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_admin-change-user.html) by an administrator. Once the password is created, it should be vaulted in a secure location and only available to select members of your organization. Often, for separation of duties purposes, the same person is not permitted access to the Break Glass user password and the MFA device.
-<br/><br/>
+```bash
+# Navigate to the break glass user directory
+cd bg-user/
+
+# Run the automated deployment script
+./deploy-all-regions.sh
+```
+
+**The script will prompt you for:**
+
+- Email address for security notifications
+- Primary region (defaults to us-east-1)
+- Confirmation before deployment
+
+**What it does automatically:**
+
+- Deploys primary monitoring infrastructure in your chosen region
+- Creates SNS topic, KMS key, and break glass user
+- Deploys monitoring rules in all other AWS regions
+- Configures cross-region event forwarding
+- Skips regions not enabled in your account
+- Provides progress indicators and error handling
+
+### Option 2: Manual Region-by-Region Deployment
+
+**Step 1: Deploy Primary Region**
+
+```bash
+cd bg-user/
+terraform init
+terraform apply -var="emailAddress=security-team@company.com"
+```
+
+**Step 2: Deploy Secondary Regions**
+
+```bash
+# Example for eu-west-1
+AWS_DEFAULT_REGION=eu-west-1 terraform apply \
+  -var="emailAddress=security-team@company.com" \
+  -var="primary_region=us-east-1" \
+  -var="primary_account_id=123456789012"
+```
+
+**Step 3: Deploy Cross-Account Roles**
+
+In each target account where break glass access is needed:
+
+```bash
+cd ../bg-role/
+terraform init
+terraform apply -var="AccountID=123456789012"
+```
+
+### Deployment Verification
+
+After deployment:
+
+1. **Check email** for SNS subscription confirmation
+2. **Verify resources** in AWS Console:
+   - IAM user "BreakglassUser" in management account
+   - SNS topic "breakglassuser-console-logins"
+   - EventBridge rules in all deployed regions
+   - Cross-account roles in target accounts
+
+### Cleanup
+
+To remove all break glass infrastructure:
+
+```bash
+cd bg-user/
+./destroy-all-regions.sh
+```
+
+The cleanup script will:
+
+- Prompt for the email and primary region used during deployment
+- Destroy resources in all secondary regions first
+- Destroy primary region resources last
+- Remove all Terraform workspaces
+
+## Post-Deployment Security Configuration
+
+**1. Enable Multi-Factor Authentication (MFA)**
+
+The break glass user requires MFA due to its extensive privileges.
+
+**MFA Device Security:**
+
+- Store MFA device/software securely with limited access
+- Typically managed by cloud security team members only
+- Consider hardware tokens for maximum security
+- Document MFA device location in incident response procedures
+
+**2. Create and Vault the Password**
+
+The Terraform code intentionally does not create passwords to avoid:
+
+- Embedding credentials in code
+- Storing passwords in Terraform state files
+
+**Password Creation:**
+
+```bash
+# Create password via AWS CLI
+aws iam create-login-profile \
+  --user-name BreakglassUser \
+  --password 'SecureRandomPassword123!' \
+  --password-reset-required
+```
+
+**Password Storage Requirements:**
+
+- Use enterprise password manager or secure vault
+- Limit access to authorized personnel only
+- Implement separation of duties (different people access password vs. MFA)
+- Document password location in incident response procedures
+- Rotate password regularly (quarterly recommended)
 
 # References
 
@@ -92,8 +243,8 @@ When the Break Glass User assumes the Break Glass Role in another account (via t
 
 [IAM Identity Center](https://aws.amazon.com/iam/identity-center/)
 
-[Identity and Access Managment](https://aws.amazon.com/iam/)
-<br/><br/>
+[Identity and Access Management](https://aws.amazon.com/iam/)
 
 # License
+
 This repo is licensed under the MIT-0 license.

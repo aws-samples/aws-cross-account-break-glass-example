@@ -7,14 +7,15 @@ This repository provides a reference implementation for emergency access to AWS 
 :information_source: **Global Monitoring** :information_source: This solution provides comprehensive monitoring across all AWS regions where ConsoleLogin events can occur. Break glass activities (console logins, role switches, and role assumptions) are monitored globally and forwarded to a centralized SNS topic for unified alerting.
 
 # Contents
-
-1. [Introduction](#introduction)
-2. [The Break Glass User](#the-break-glass-user)
-3. [Solution Architecture](#solution-architecture)
-4. [Deployment Instructions](#deployment-instructions)
-5. [Post-Deployment Security Configuration](#post-deployment-security-configuration)
-6. [References](#references)
-7. [License](#license)
+1. [Introduction](/README.md#introduction)
+2. [The Break Glass User](/README.md#the-break-glass-user)
+3. [Solution Architecture](/README.md#solution-architecture)
+4. [Prerequisites](/README.md#prerequisites)
+5. [Deployment Instructions](/README.md#deployment-instructions)
+6. [After Deployment](/README.md#after-deployment)
+7. [References](/README.md#references)
+8. [License](/README.md#license)
+<br/><br/>
 
 # Introduction
 
@@ -97,6 +98,22 @@ This architecture ensures comprehensive monitoring regardless of which region th
     alt="AWS Cross Account Break Glass Architecture">
 </img>
 <br/>
+
+## Prerequisites
+
+Before deploying this solution, ensure the following requirements are met:
+
+- **AWS CloudTrail with Management Events:** This solution relies on CloudTrail to capture IAM authentication and role assumption events. You must have a multi-region CloudTrail trail configured with management events enabled in the accounts where you deploy this solution. Without CloudTrail, EventBridge will not receive the events needed to trigger SNS notifications.
+
+  To verify or create a CloudTrail trail:
+  - Navigate to the CloudTrail console in your AWS account
+  - Ensure you have at least one trail with "Management events" enabled
+  - The trail should be configured as multi-region to capture events across all regions
+  - For more information, see the [AWS CloudTrail documentation](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-create-and-update-a-trail.html)
+
+- **Terraform:** This solution uses Terraform for infrastructure deployment. Ensure you have Terraform installed and configured with appropriate AWS credentials.
+
+- **Email Address or Distribution List:** You will need an email address or distribution list to receive break glass notifications.
 
 ## Deployment Instructions
 
